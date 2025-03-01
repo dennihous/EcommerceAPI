@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EcommerceAPI.Models;
+using EcommerceAPI.DTOs;
+using EcommerceAPI.Services;
+using Microsoft.Extensions.Logging;
 
 namespace EcommerceAPI.Controllers
 {
@@ -13,95 +16,89 @@ namespace EcommerceAPI.Controllers
     [ApiController]
     public class ReviewsController : ControllerBase
     {
-        private readonly EcommerceContext _context;
+        private readonly IReviewService _reviewService;
+        private readonly ILogger<ReviewsController> _logger;
 
-        public ReviewsController(EcommerceContext context)
+        public ReviewsController(IReviewService reviewService, ILogger<ReviewsController> logger)
         {
-            _context = context;
+            _reviewService = reviewService;
+            _logger = logger;
         }
 
         // GET: api/Reviews
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Review>>> GetReviews()
+        public async Task<ActionResult<IEnumerable<ReviewDTO>>> GetReviews()
         {
-            return await _context.Reviews.ToListAsync();
+            _logger.LogInformation("Fetching all reviews.");
+            var reviews = await _reviewService.GetAllReviewsAsync();
+            return Ok(reviews);
         }
 
         // GET: api/Reviews/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Review>> GetReview(int id)
+        public async Task<ActionResult<ReviewDTO>> GetReview(int id)
         {
-            var review = await _context.Reviews.FindAsync(id);
+            _logger.LogInformation($"Fetching review with ID {id}.");
+            var review = await _reviewService.GetReviewByIdAsync(id);
 
             if (review == null)
             {
+                _logger.LogWarning($"Review with ID {id} not found.");
                 return NotFound();
             }
 
-            return review;
-        }
-
-        // PUT: api/Reviews/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutReview(int id, Review review)
-        {
-            if (id != review.ReviewId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(review).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ReviewExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            return Ok(review);
         }
 
         // POST: api/Reviews
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Review>> PostReview(Review review)
+        public async Task<ActionResult<ReviewDTO>> PostReview(ReviewDTO reviewDTO)
         {
-            _context.Reviews.Add(review);
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Creating a new review.");
+            await _reviewService.AddReviewAsync(reviewDTO);
+            return CreatedAtAction("GetReview", new { id = reviewDTO.ReviewId }, reviewDTO);
+        }
 
-            return CreatedAtAction("GetReview", new { id = review.ReviewId }, review);
+        // PUT: api/Reviews/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutReview(int id, ReviewDTO reviewDTO)
+        {
+            _logger.LogInformation($"Updating review with ID {id}.");
+            if (id != reviewDTO.ReviewId)
+            {
+                _logger.LogWarning("Review ID mismatch.");
+                return BadRequest();
+            }
+
+            try
+            {
+                await _reviewService.UpdateReviewAsync(id, reviewDTO);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Review with ID {id} not found for update.");
+                return NotFound();
+            }
+
+            return NoContent();
         }
 
         // DELETE: api/Reviews/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteReview(int id)
         {
-            var review = await _context.Reviews.FindAsync(id);
-            if (review == null)
+            _logger.LogInformation($"Deleting review with ID {id}.");
+            try
             {
+                await _reviewService.DeleteReviewAsync(id);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Review with ID {id} not found for deletion.");
                 return NotFound();
             }
 
-            _context.Reviews.Remove(review);
-            await _context.SaveChangesAsync();
-
             return NoContent();
-        }
-
-        private bool ReviewExists(int id)
-        {
-            return _context.Reviews.Any(e => e.ReviewId == id);
         }
     }
 }
