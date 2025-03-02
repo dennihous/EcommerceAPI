@@ -10,8 +10,8 @@ namespace EcommerceAPI.Models
         public string Email { get; set; }
 
         [JsonIgnore]
-        public List<Order>? Orders { get; set; }
+        public List<Order>? Orders { get; set; } = new List<Order>();
 
-        public List<Review>? Reviews { get; set; } // Add this line
+        public List<Review>? Reviews { get; set; }
     }
 }

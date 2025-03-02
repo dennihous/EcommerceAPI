@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EcommerceAPI.Models;
+using EcommerceAPI.DTOs;
+using EcommerceAPI.Services;
+using Microsoft.Extensions.Logging;
 
 namespace EcommerceAPI.Controllers
 {
@@ -13,95 +16,89 @@ namespace EcommerceAPI.Controllers
     [ApiController]
     public class CustomersController : ControllerBase
     {
-        private readonly EcommerceContext _context;
+        private readonly ICustomerService _customerService;
+        private readonly ILogger<CustomersController> _logger;
 
-        public CustomersController(EcommerceContext context)
+        public CustomersController(ICustomerService customerService, ILogger<CustomersController> logger)
         {
-            _context = context;
+            _customerService = customerService;
+            _logger = logger;
         }
 
         // GET: api/Customers
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
+        public async Task<ActionResult<IEnumerable<CustomerDTO>>> GetCustomers()
         {
-            return await _context.Customers.ToListAsync();
+            _logger.LogInformation("Fetching all customers.");
+            var customers = await _customerService.GetAllCustomersAsync();
+            return Ok(customers);
         }
 
         // GET: api/Customers/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Customer>> GetCustomer(int id)
+        public async Task<ActionResult<CustomerDTO>> GetCustomer(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
+            _logger.LogInformation($"Fetching customer with ID {id}.");
+            var customer = await _customerService.GetCustomerByIdAsync(id);
 
             if (customer == null)
             {
+                _logger.LogWarning($"Customer with ID {id} not found.");
                 return NotFound();
             }
 
-            return customer;
-        }
-
-        // PUT: api/Customers/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutCustomer(int id, Customer customer)
-        {
-            if (id != customer.CustomerId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(customer).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!CustomerExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            return Ok(customer);
         }
 
         // POST: api/Customers
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Customer>> PostCustomer(Customer customer)
+        public async Task<ActionResult<CustomerDTO>> PostCustomer(CustomerDTO customerDTO)
         {
-            _context.Customers.Add(customer);
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Creating a new customer.");
+            await _customerService.AddCustomerAsync(customerDTO);
+            return CreatedAtAction("GetCustomer", new { id = customerDTO.CustomerId }, customerDTO);
+        }
 
-            return CreatedAtAction("GetCustomer", new { id = customer.CustomerId }, customer);
+        // PUT: api/Customers/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutCustomer(int id, CustomerDTO customerDTO)
+        {
+            _logger.LogInformation($"Updating customer with ID {id}.");
+            if (id != customerDTO.CustomerId)
+            {
+                _logger.LogWarning("Customer ID mismatch.");
+                return BadRequest();
+            }
+
+            try
+            {
+                await _customerService.UpdateCustomerAsync(id, customerDTO);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Customer with ID {id} not found for update.");
+                return NotFound();
+            }
+
+            return NoContent();
         }
 
         // DELETE: api/Customers/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCustomer(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer == null)
+            _logger.LogInformation($"Deleting customer with ID {id}.");
+            try
             {
+                await _customerService.DeleteCustomerAsync(id);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Customer with ID {id} not found for deletion.");
                 return NotFound();
             }
 
-            _context.Customers.Remove(customer);
-            await _context.SaveChangesAsync();
-
             return NoContent();
-        }
-
-        private bool CustomerExists(int id)
-        {
-            return _context.Customers.Any(e => e.CustomerId == id);
         }
     }
 }

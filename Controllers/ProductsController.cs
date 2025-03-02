@@ -17,19 +17,12 @@ namespace EcommerceAPI.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
-    private readonly ILogger<ProductsController> _logger;
+        private readonly ILogger<ProductsController> _logger;
 
-    public ProductsController(IProductService productService, ILogger<ProductsController> logger)
-    {
-        _productService = productService;
-        _logger = logger;
-    }
-        // slowly remove this section to use services
-        private readonly EcommerceContext _context;
-
-        public ProductsController(EcommerceContext context)
+        public ProductsController(IProductService productService, ILogger<ProductsController> logger)
         {
-            _context = context;
+            _productService = productService;
+            _logger = logger;
         }
 
         // GET: api/Products
@@ -39,142 +32,73 @@ namespace EcommerceAPI.Controllers
             _logger.LogInformation("Fetching all products.");
             var products = await _productService.GetAllProductsAsync();
             return Ok(products);
-            // var products = await _context.Products
-            //     .Select(p => new ProductDTO
-            //     {
-            //         ProductId = p.ProductId,
-            //         Name = p.Name,
-            //         Price = p.Price,
-            //         Description = p.Description
-            //     })
-            //     .ToListAsync();
-
-            // return Ok(products);
-            // // return await _context.Products.ToListAsync();
         }
 
         // GET: api/Products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductDTO>> GetProduct(int id)
         {
-            var product = await _context.Products
-                .Where(p => p.ProductId == id)
-                .Select(p => new ProductDTO
-                {
-                    ProductId = p.ProductId,
-                    Name = p.Name,
-                    Price = p.Price,
-                    Description = p.Description
-                })
-                .FirstOrDefaultAsync();
+            _logger.LogInformation($"Fetching product with ID {id}.");
+            var product = await _productService.GetProductByIdAsync(id);
 
             if (product == null)
             {
+                _logger.LogWarning($"Product with ID {id} not found.");
                 return NotFound();
             }
 
             return Ok(product);
-            // var product = await _context.Products.FindAsync(id);
-
-            // if (product == null)
-            // {
-            //     return NotFound();
-            // }
-
-            // return product;
-        }
-
-        // PUT: api/Products/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(int id, ProductDTO productDTO)
-        {
-            if (id != productDTO.ProductId)
-            {
-                return BadRequest();
-            }
-
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
-            {
-                return NotFound();
-            }
-
-            product.Name = productDTO.Name;
-            product.Price = productDTO.Price;
-            product.Description = productDTO.Description;
-
-            _context.Entry(product).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-            // if (id != product.ProductId)
-            // {
-            //     return BadRequest();
-            // }
-
-            // _context.Entry(product).State = EntityState.Modified;
-
-            // try
-            // {
-            //     await _context.SaveChangesAsync();
-            // }
-            // catch (DbUpdateConcurrencyException)
-            // {
-            //     if (!ProductExists(id))
-            //     {
-            //         return NotFound();
-            //     }
-            //     else
-            //     {
-            //         throw;
-            //     }
-            // }
-
-            // return NoContent();
         }
 
         // POST: api/Products
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<ProductDTO>> PostProduct(ProductDTO productDTO)
         {
-            var product = new Product
+            _logger.LogInformation("Creating a new product.");
+            await _productService.AddProductAsync(productDTO);
+            return CreatedAtAction("GetProduct", new { id = productDTO.ProductId }, productDTO);
+        }
+
+        // PUT: api/Products/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutProduct(int id, ProductDTO productDTO)
+        {
+            _logger.LogInformation($"Updating product with ID {id}.");
+            if (id != productDTO.ProductId)
             {
-                Name = productDTO.Name,
-                Price = productDTO.Price,
-                Description = productDTO.Description
-            };
+                _logger.LogWarning("Product ID mismatch.");
+                return BadRequest();
+            }
 
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _productService.UpdateProductAsync(id, productDTO);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Product with ID {id} not found for update.");
+                return NotFound();
+            }
 
-            return CreatedAtAction("GetProduct", new { id = product.ProductId }, productDTO);
-            // _context.Products.Add(product);
-            // await _context.SaveChangesAsync();
-
-            // return CreatedAtAction("GetProduct", new { id = product.ProductId }, product);
+            return NoContent();
         }
 
         // DELETE: api/Products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            _logger.LogInformation($"Deleting product with ID {id}.");
+            try
             {
+                await _productService.DeleteProductAsync(id);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Product with ID {id} not found for deletion.");
                 return NotFound();
             }
 
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
-
             return NoContent();
         }
-
-        // private bool ProductExists(int id)
-        // {
-        //     return _context.Products.Any(e => e.ProductId == id);
-        // }
     }
 }

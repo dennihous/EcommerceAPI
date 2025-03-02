@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EcommerceAPI.Models;
+using EcommerceAPI.DTOs;
+using EcommerceAPI.Services;
+using Microsoft.Extensions.Logging;
 
 namespace EcommerceAPI.Controllers
 {
@@ -13,95 +16,89 @@ namespace EcommerceAPI.Controllers
     [ApiController]
     public class OrdersController : ControllerBase
     {
-        private readonly EcommerceContext _context;
+        private readonly IOrderService _orderService;
+        private readonly ILogger<OrdersController> _logger;
 
-        public OrdersController(EcommerceContext context)
+        public OrdersController(IOrderService orderService, ILogger<OrdersController> logger)
         {
-            _context = context;
+            _orderService = orderService;
+            _logger = logger;
         }
 
         // GET: api/Orders
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
+        public async Task<ActionResult<IEnumerable<OrderDTO>>> GetOrders()
         {
-            return await _context.Orders.ToListAsync();
+            _logger.LogInformation("Fetching all orders.");
+            var orders = await _orderService.GetAllOrdersAsync();
+            return Ok(orders);
         }
 
         // GET: api/Orders/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Order>> GetOrder(int id)
+        public async Task<ActionResult<OrderDTO>> GetOrder(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
+            _logger.LogInformation($"Fetching order with ID {id}.");
+            var order = await _orderService.GetOrderByIdAsync(id);
 
             if (order == null)
             {
+                _logger.LogWarning($"Order with ID {id} not found.");
                 return NotFound();
             }
 
-            return order;
-        }
-
-        // PUT: api/Orders/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutOrder(int id, Order order)
-        {
-            if (id != order.OrderId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(order).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!OrderExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            return Ok(order);
         }
 
         // POST: api/Orders
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Order>> PostOrder(Order order)
+        public async Task<ActionResult<OrderDTO>> PostOrder(OrderDTO orderDTO)
         {
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Creating a new order.");
+            await _orderService.AddOrderAsync(orderDTO);
+            return CreatedAtAction("GetOrder", new { id = orderDTO.OrderId }, orderDTO);
+        }
 
-            return CreatedAtAction("GetOrder", new { id = order.OrderId }, order);
+        // PUT: api/Orders/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutOrder(int id, OrderDTO orderDTO)
+        {
+            _logger.LogInformation($"Updating order with ID {id}.");
+            if (id != orderDTO.OrderId)
+            {
+                _logger.LogWarning("Order ID mismatch.");
+                return BadRequest();
+            }
+
+            try
+            {
+                await _orderService.UpdateOrderAsync(id, orderDTO);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Order with ID {id} not found for update.");
+                return NotFound();
+            }
+
+            return NoContent();
         }
 
         // DELETE: api/Orders/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteOrder(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
+            _logger.LogInformation($"Deleting order with ID {id}.");
+            try
             {
+                await _orderService.DeleteOrderAsync(id);
+            }
+            catch (KeyNotFoundException)
+            {
+                _logger.LogWarning($"Order with ID {id} not found for deletion.");
                 return NotFound();
             }
 
-            _context.Orders.Remove(order);
-            await _context.SaveChangesAsync();
-
             return NoContent();
-        }
-
-        private bool OrderExists(int id)
-        {
-            return _context.Orders.Any(e => e.OrderId == id);
         }
     }
 }
