@@ -1,2 +1,4 @@
 bin/
 obj/
+ecommerce.db*
+production.db
