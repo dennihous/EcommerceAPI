@@ -46,17 +46,29 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 
 var app = builder.Build();
+var jwtKey = Environment.GetEnvironmentVariable("Jwt__Key");
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.MapOpenApi(); // Swagger in all environments
 
 app.UseHttpsRedirection();
 app.UseAuthentication(); // Enable authentication
 app.UseAuthorization();
 app.UseMiddleware<ErrorHandlingMiddleware>();
+
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var roles = new[] { "Admin", "Customer" };
+
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+        }
+    }
+}
 
 app.MapControllers();
 
