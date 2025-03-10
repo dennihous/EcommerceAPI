@@ -1,4 +1,4 @@
-name: .NET CI
+name: .NET Build and Test
 
 on:
   push:
@@ -26,8 +26,18 @@ jobs:
         run: dotnet build --no-restore
           
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build EcommerceAPI.Tests/EcommerceAPI.Tests.csproj || echo "Tests completed with warnings"
 
+      - name: Verify Tests Passed
+        run: |
+          if grep -q "Test Run Successful" <<< "$(dotnet test --no-build --logger:"console;verbosity=minimal" EcommerceAPI.Tests/EcommerceAPI.Tests.csproj)"; then
+            echo "Tests passed successfully"
+            exit 0
+          else
+            echo "Tests failed"
+            exit 1
+          fi
+          
       - name: Set up environment variables
         env:
           Jwt__Key: ${{ secrets.JWT_KEY }}
