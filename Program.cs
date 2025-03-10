@@ -6,11 +6,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using dotenv.net;
 
 var builder = WebApplication.CreateBuilder(args);
 
+DotEnv.Load();
+string jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
+
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<EcommerceContext>(options =>
@@ -20,8 +23,6 @@ builder.Services.AddDbContext<EcommerceContext>(options =>
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<EcommerceContext>()
     .AddDefaultTokenProviders();
-
-var jwtKey = Environment.GetEnvironmentVariable("Jwt__Key");
 
 if (string.IsNullOrEmpty(jwtKey))
 {
