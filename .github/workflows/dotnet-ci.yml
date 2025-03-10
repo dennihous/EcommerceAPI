@@ -25,19 +25,25 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
           
-      - name: Test
-        run: dotnet test --no-build EcommerceAPI.Tests/EcommerceAPI.Tests.csproj || echo "Tests completed with warnings"
-
-      - name: Verify Tests Passed
+      - name: Run Tests and Capture Output
+        id: test-run
         run: |
-          if grep -q "Test Run Successful" <<< "$(dotnet test --no-build --logger:"console;verbosity=minimal" EcommerceAPI.Tests/EcommerceAPI.Tests.csproj)"; then
-            echo "Tests passed successfully"
+          OUTPUT=$(dotnet test --no-build EcommerceAPI.Tests/EcommerceAPI.Tests.csproj)
+          echo "$OUTPUT"
+          echo "TEST_OUTPUT<<EOF" >> $GITHUB_ENV
+          echo "$OUTPUT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        
+      - name: Determine Test Success
+        run: |
+          if [[ "${{ env.TEST_OUTPUT }}" == *"Passed: 10"* ]]; then
+            echo "All tests passed successfully"
             exit 0
           else
             echo "Tests failed"
             exit 1
           fi
-          
+
       - name: Set up environment variables
         env:
           Jwt__Key: ${{ secrets.JWT_KEY }}
